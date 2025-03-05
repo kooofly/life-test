@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  hello
+  <script>
+    const socket = new WebSocket('ws://localhost:7001');
+
+    socket.onopen = () => {
+      console.log('Connected to server');
+      socket.send(JSON.stringify({ type: 'join' }));
+    };
+
+    function heartbeat() {
+      console.log('xxx', this);
+      clearTimeout(this.pingTimeout);
+
+      // 每次接收 ping 之后，延迟等待，如果下一次未拿到服务端 ping 消息，则认为出现问题
+      this.pingTimeout = setTimeout(() => {
+        // 重连或者中止
+      }, 30000 + 1000);
+    }
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      console.log('message::', message);
+      if (message.type === 'join') {
+        console.log('Your user ID:', message.userId);
+      } else if (message.type === 'ping') {
+        // 响应心跳包
+        socket.send(JSON.stringify({ type: 'pong' }));
+      } else if (message.type === 'group-chat') {
+        console.log('Group chat:', message.content);
+      } else if (message.type === 'private-chat') {
+        console.log('Private chat from', message.senderId, ':', message.content);
+      }
+    };
+    function a() {
+      console.log(1);
+      socket.send(JSON.stringify({ type: 'call', params: { a: 1 } }))
+    }
+  </script>
+  <button id="a">AAA</button>
+  <script>
+    document.querySelector('#a').addEventListener('click', () => {
+      a();
+    })
+  </script>
+</body>
+</html>

@@ -6,10 +6,15 @@ import { join } from 'path';
 // import { DefaultErrorFilter } from './filter/default.filter';
 // import { NotFoundFilter } from './filter/notfound.filter';
 import { ReportMiddleware } from './middleware/report.middleware';
+// import { HeartbeatMiddleware } from '../middleware/heartbeat.middleware';
+import * as ws from '@midwayjs/ws';
+import * as staticFile from '@midwayjs/static-file';
 
 @Configuration({
   imports: [
     koa,
+    staticFile,
+    ws,
     validate,
     {
       component: info,

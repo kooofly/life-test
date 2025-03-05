@@ -4,12 +4,18 @@
   "description": "",
   "private": true,
   "dependencies": {
-    "@midwayjs/bootstrap": "^3.12.0",
-    "@midwayjs/core": "^3.12.0",
-    "@midwayjs/info": "^3.12.0",
-    "@midwayjs/koa": "^3.12.0",
-    "@midwayjs/logger": "^3.1.0",
-    "@midwayjs/validate": "^3.12.0"
+    "@midwayjs/bootstrap": "^3.20.3",
+    "@midwayjs/core": "^3.20.3",
+    "@midwayjs/decorator": "^3.20.3",
+    "@midwayjs/info": "^3.20.3",
+    "@midwayjs/koa": "^3.20.3",
+    "@midwayjs/logger": "^3.4.2",
+    "@midwayjs/static-file": "^3.20.3",
+    "@midwayjs/validate": "^3.20.3",
+    "@midwayjs/ws": "^3.20.3",
+    "@types/ws": "^8.18.0",
+    "lz-string": "^1.5.0",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "@midwayjs/mock": "^3.12.0",
