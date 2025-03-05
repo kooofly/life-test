@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet/less" type="text/css" href="./code/skeleton.less" />
+    <script src="./code/less.js" ></script>
+    <style>
+        html, body {
+            
+        }
+        .f {
+            min-height: 100vh;
+            max-width: 50%;
+        }
+        .nav-item {
+            padding: 4px 10px;
+        }
+    </style>
+</head>
+<body>
+    <nav id="nav" class="x x-container">
+
+    </nav>
+    <div id="container" class="x x-container">
+        <img class="f" src="./pic/春天花会开完整.png" alt="">
+        <img class="f" src="./pic/春天花会开完整.png" alt="">
+        <img class="f" src="./pic/春天花会开完整.png" alt="">
+    </div>
+    <script>
+        const origin = location.origin
+        fetch(`${origin}/api/guitar/all`).then(rs => rs.json()).then(rs => {
+            console.log(rs)
+            const group = {}
+            const list = []
+            rs.forEach(v => {
+                const name = v.split('-')[0].trim()
+                if (!group[name]) {
+                    group[name] = []
+                    list.push(name)
+                }
+                group[name].push(v)
+            })
+            document.querySelector('#nav').innerHTML = list.map(v => {
+                return `<a class="nav-item" href="/public/g.html?t=${v}">${v}</a>`
+            }).join('');
+
+            const s = new URLSearchParams(location.search)
+            let t = s.get('t')
+            if (!t) {
+                t = list[0]
+            }
+            const g = group[t]
+            document.querySelector('#container').innerHTML = g.map(v => {
+                return `<img class="f" src="./pic/${v}" alt="">`
+            }).join('');
+        })
+
+    </script>
+</body>
+</html>
