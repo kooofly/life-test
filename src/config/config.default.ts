@@ -4,7 +4,7 @@ export default {
   // use for cookie sign key, should change to your own and keep security
   keys: '1740712992556_750',
   koa: {
-    port: 7001,
+    port: 80,
   },
   // https://midwayjs.org/docs/extensions/ws
   webSocket: {
