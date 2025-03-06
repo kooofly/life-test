@@ -6,14 +6,48 @@
   <title>Document</title>
 </head>
 <body>
-  hello
   <script>
-    const socket = new WebSocket('ws://localhost:7001');
+    // export enum ESocketMessageType {
+    //   /**
+    //    * 用户加入
+    //    */
+    //   join = 'j',
+    //   /**
+    //    * 心跳检测ping
+    //    */
+    //   ping = 'pi',
+    //   /**
+    //    * 心跳检测pong
+    //    */
+    //   pong = 'p',
+    //   /**
+    //    * 消息
+    //    */
+    //   message = 'm',
+    // }
 
-    socket.onopen = () => {
-      console.log('Connected to server');
-      socket.send(JSON.stringify({ type: 'join' }));
-    };
+    function join(g, e) {
+      const socket = new WebSocket(`ws://${location.hostname}`);
+
+      socket.onopen = () => {
+        console.log('Connected to server');
+        socket.send(JSON.stringify({ t: 'j', g, e }));
+      };
+      window.socket = socket;
+      window.socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        console.log('message::', message);
+        if (message.t === 'j') {
+          console.log('Your user ID:', message.userId);
+        } else if (message.t === 'pi') {
+          // 响应心跳包
+          socket.send(JSON.stringify({ t: 'p' }));
+        } else if (message.t === 'm') {
+          console.log('message:', message);
+        }
+      };
+    }
+    
 
     function heartbeat() {
       console.log('xxx', this);
@@ -25,30 +59,47 @@
       }, 30000 + 1000);
     }
 
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      console.log('message::', message);
-      if (message.type === 'join') {
-        console.log('Your user ID:', message.userId);
-      } else if (message.type === 'ping') {
-        // 响应心跳包
-        socket.send(JSON.stringify({ type: 'pong' }));
-      } else if (message.type === 'group-chat') {
-        console.log('Group chat:', message.content);
-      } else if (message.type === 'private-chat') {
-        console.log('Private chat from', message.senderId, ':', message.content);
-      }
-    };
+    
     function a() {
       console.log(1);
       socket.send(JSON.stringify({ type: 'call', params: { a: 1 } }))
     }
   </script>
-  <button id="a">AAA</button>
+  
+  <br />
+  hello
+  <button id="join">join</button>
+  <div>
+    group:
+    <input id="group" type="text">
+  </div>
+
+  <div>
+    endpoint:
+    <input id="endpoint" type="text">
+  </div>
+
+  <button id="send">send</button>
+  <div>
+    message:
+    <input id="message" type="text">
+  </div>
   <script>
-    document.querySelector('#a').addEventListener('click', () => {
-      a();
-    })
+    document.querySelector('#join').addEventListener('click', () => {
+      join(
+        document.querySelector('#group').value || 'g1',
+        document.querySelector('#endpoint').value || 'm'
+      );
+    });
+    document.querySelector('#send').addEventListener('click', () => {
+      const group = document.querySelector('#group').value || 'm';
+      const endpoint = document.querySelector('#group').value || 'a';
+      const msg = document.querySelector('#message').value
+      socket.send(JSON.stringify({
+        t: 'm',
+        c: msg || 'hello!!!'
+      }));
+    });
   </script>
 </body>
 </html>
