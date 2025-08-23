@@ -27,3 +27,11 @@ $ npm start
 
 
 [midway]: https://midwayjs.org
+
+### AI
+node 20 可用ai https://github.com/musistudio/claude-code-router/blob/main/README_zh.md
+- ccr ui 管理模型
+- ccr start 启动服务
+
+node 22 可用ai https://platform.iflow.cn/cli/quickstart
+- iflow

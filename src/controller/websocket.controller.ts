@@ -10,7 +10,7 @@ import { Context } from '@midwayjs/ws';
 import * as http from 'http';
 // import { Context, Application } from '@midwayjs/ws';
 import { ChatService } from '../service/chat.service';
-import { setupHeartbeat } from '../util/heartbeat.util';
+import { setupHeartbeat, removeHeartbeat } from '../util/heartbeat.util';
 import { ESocketMessageKey, ESocketMessageType } from '../enums/socket.enum';
 
 @WSController()
@@ -91,5 +91,7 @@ export class WebsocketController {
   @OnWSDisConnection()
   async disconnect(id: number) {
     console.log('disconnect ' + id);
+    // 清理心跳机制
+    removeHeartbeat(id.toString());
   }
 }
