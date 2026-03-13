@@ -4,24 +4,39 @@ import * as path from 'path';
 import * as fs from 'fs';
 import initSqlJs, { Database } from 'sql.js';
 
-@Controller('/')
-export class HomeController {
-  @Inject()
-  ctx: Context;
-
+// 单例数据库管理
+class DbManager {
+  private static instance: DbManager;
   private db: Database | null = null;
-  private dbInitialized = false;
+  private initPromise: Promise<Database> | null = null;
 
-  // 初始化数据库（异步）
-  private async initDb(): Promise<Database> {
-    if (this.dbInitialized && this.db) {
+  private constructor() {}
+
+  static getInstance(): DbManager {
+    if (!DbManager.instance) {
+      DbManager.instance = new DbManager();
+    }
+    return DbManager.instance;
+  }
+
+  async getDb(): Promise<Database> {
+    if (this.db) {
       return this.db;
     }
 
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = this.init();
+    return this.initPromise;
+  }
+
+  private async init(): Promise<Database> {
     const SQL = await initSqlJs();
     const dbPath = path.join(process.cwd(), 'data', 'requirements.db');
     const dataDir = path.dirname(dbPath);
-    
+
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
@@ -38,7 +53,7 @@ export class HomeController {
     this.db.run(`
       CREATE TABLE IF NOT EXISTS requirements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip_address TEXT NOT NULL UNIQUE,
+        ip_address TEXT NOT NULL,
         user_agent TEXT,
         content TEXT NOT NULL,
         author TEXT,
@@ -48,19 +63,25 @@ export class HomeController {
       )
     `);
 
-    this.dbInitialized = true;
     return this.db;
   }
 
-  // 保存数据库到文件
-  private async saveDb(): Promise<void> {
+  async saveDb(): Promise<void> {
     if (!this.db) return;
-    
+
     const dbPath = path.join(process.cwd(), 'data', 'requirements.db');
     const data = this.db.export();
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
   }
+}
+
+@Controller('/')
+export class HomeController {
+  @Inject()
+  ctx: Context;
+
+  private dbManager = DbManager.getInstance();
 
   // 获取客户端 IP
   private getClientIP(ctx: Context): string {
@@ -485,18 +506,17 @@ export class HomeController {
       };
     }
 
-    const db = await this.initDb();
+    const db = await this.dbManager.getDb();
     const ipAddress = this.getClientIP(this.ctx);
     const userAgent = this.ctx.get('User-Agent');
 
     // 检查该 IP 是否已经提交过（永久去重）
-    const existingRecord = db.prepare(`
-      SELECT id FROM requirements 
-      WHERE ip_address = ?
-      LIMIT 1
-    `).get([ipAddress]);
+    const stmt = db.prepare('SELECT id FROM requirements WHERE ip_address = ? LIMIT 1');
+    stmt.bind([ipAddress]);
+    const hasRecord = stmt.step();
+    stmt.free();
 
-    if (existingRecord) {
+    if (hasRecord) {
       return {
         success: false,
         duplicate: true,
@@ -505,13 +525,13 @@ export class HomeController {
     }
 
     // 保存到数据库
-    db.run(`
-      INSERT INTO requirements (ip_address, user_agent, content, author, requirement_content)
-      VALUES (?, ?, ?, ?, ?)
-    `, [ipAddress, userAgent, `${author}：${requirement}`, author, requirement]);
+    db.run(
+      'INSERT INTO requirements (ip_address, user_agent, content, author, requirement_content) VALUES (?, ?, ?, ?, ?)',
+      [ipAddress, userAgent, `${author}：${requirement}`, author, requirement]
+    );
 
     // 保存数据库到文件
-    await this.saveDb();
+    await this.dbManager.saveDb();
 
     // 随机选择一条提示文案
     const randomIndex = Math.floor(Math.random() * this.tipMessages.length);
@@ -525,19 +545,16 @@ export class HomeController {
 
   @Get('/clawiii')
   async clawiii(): Promise<string> {
-    const db = await this.initDb();
+    const db = await this.dbManager.getDb();
     
     // 获取所有需求数据
-    const stmt = db.prepare(`
-      SELECT id, author, requirement_content, content, ip_address, created_at
-      FROM requirements
-      ORDER BY created_at DESC
-    `);
+    const stmt = db.prepare('SELECT id, author, requirement_content, content, ip_address, created_at FROM requirements ORDER BY created_at DESC');
     
     const records: any[] = [];
     while (stmt.step()) {
       records.push(stmt.getAsObject());
     }
+    stmt.free();
 
     const rowsHtml = records.map((record, index) => `
       <tr onclick="showDetail(${record.id})" style="cursor: pointer;">
