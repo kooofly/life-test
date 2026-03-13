@@ -4,6 +4,6 @@ import { Controller, Get } from '@midwayjs/core';
 export class HomeController {
   @Get('/')
   async home(): Promise<string> {
-    return 'hello claw claw claw ！！';
+    return 'hello claw claw ！！';
   }
 }
