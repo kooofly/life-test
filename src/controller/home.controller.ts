@@ -1,12 +1,58 @@
-import { Controller, Get, Post, Inject, Query, Body } from '@midwayjs/core';
+import { Controller, Get, Post, Inject, Body } from '@midwayjs/core';
 import { Context } from '@midwayjs/koa';
+import * as path from 'path';
 
 @Controller('/')
 export class HomeController {
   @Inject()
   ctx: Context;
 
-  // 随机提示文案库（50+ 条）
+  private db: any;
+
+  constructor() {
+    // 初始化 SQLite 数据库
+    const Database = require('better-sqlite3');
+    const fs = require('fs');
+    const dbPath = path.join(process.cwd(), 'data', 'requirements.db');
+    // 确保 data 目录存在
+    const dataDir = path.dirname(dbPath);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    this.db = new Database(dbPath);
+    
+    // 创建表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS requirements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_address TEXT NOT NULL,
+        user_agent TEXT,
+        content TEXT NOT NULL,
+        author TEXT,
+        requirement_content TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // 创建索引
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ip_address ON requirements(ip_address);
+      CREATE INDEX IF NOT EXISTS idx_created_at ON requirements(created_at DESC);
+    `);
+  }
+
+  // 获取客户端 IP
+  private getClientIP(ctx: Context): string {
+    const forwarded = ctx.get('X-Forwarded-For');
+    if (forwarded) {
+      return forwarded.split(',')[0].trim();
+    }
+    return ctx.ip || '127.0.0.1';
+  }
+
+  // 随机提示文案库（100+ 条）
   private readonly tipMessages = [
     '🎉 收到！你的需求已经成功投递到宇宙中心！',
     '✨ 太棒了！需求已签收，马上开始魔法处理～',
@@ -24,7 +70,7 @@ export class HomeController {
     '🛎️ 门铃响！你的需求快递已送达～',
     '📝 笔已准备好！需求已记录在案～',
     '🗂️ 归档成功！需求已分类存放～',
-    '🎪  circus 开场！你的需求是今天的明星～',
+    '🎪 circus 开场！你的需求是今天的明星～',
     '🌻 向阳而生！需求已种进梦想花园～',
     '🎵 奏响乐章！需求已加入交响曲～',
     '🏆 冠军需求！已放入 VIP 通道～',
@@ -80,7 +126,7 @@ export class HomeController {
     '🌌 银河系漫游！需求探索宇宙～',
     '⭐ 摘星成功！需求实现梦想～',
     '🌠 流星划过！需求许下愿望～',
-    '🌍 地球online！需求已上线～',
+    '🌍 地球 online！需求已上线～',
     '🌋 火山喷发！需求热情高涨～',
     '🏖️ 沙滩漫步！需求轻松愉快～',
     '🏕️ 露营开始！需求野外生存～',
@@ -107,6 +153,17 @@ export class HomeController {
     '📋 清单勾选！需求已完成～',
     '✅ 确认无误！需求验证通过～',
     '🎊 恭喜恭喜！需求大功告成～',
+    '🎈 气球升空！需求飞上天空～',
+    '🌈 彩虹出现！需求带来希望～',
+    '✨ 星光闪烁！需求闪耀夜空～',
+    '🔔 铃声响起！需求已通知团队～',
+    '📢 广播播放！需求广而告之～',
+    '🎺 号角吹响！需求集结完毕～',
+    '🚩 旗帜飘扬！需求目标明确～',
+    '🗺️ 地图标记！需求路线规划～',
+    '🧭 指南针指向！需求方向正确～',
+    '⏰ 闹钟设定！需求时间提醒～',
+    '📅 日历标注！需求日期确认～',
   ];
 
   @Get('/')
@@ -269,6 +326,22 @@ export class HomeController {
       margin-top: 8px;
       font-style: italic;
     }
+
+    .nav-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .nav-link a {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .nav-link a:hover {
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -293,6 +366,10 @@ export class HomeController {
     <div class="result" id="result">
       <span class="emoji" id="resultEmoji">🎉</span>
       <span id="resultText"></span>
+    </div>
+
+    <div class="nav-link">
+      <a href="/clawiii">📊 查看已提交的需求</a>
     </div>
   </div>
 
@@ -327,11 +404,13 @@ export class HomeController {
         if (data.success) {
           result.style.display = 'block';
           resultText.textContent = data.message;
-          // 随机 emoji
           const emojis = ['🎉', '✨', '🚀', '💫', '🌟', '🔥', '💪', '🎯'];
           resultEmoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-          // 清空输入框
           document.getElementById('requirement').value = '';
+        } else if (data.duplicate) {
+          result.style.display = 'block';
+          resultText.textContent = '🤔 检测到您刚刚提交过相似的需求，请稍后再试～';
+          resultEmoji.textContent = '⏰';
         } else {
           alert('提交失败，请重试～');
         }
@@ -344,7 +423,6 @@ export class HomeController {
       }
     }
 
-    // 支持 Ctrl+Enter 提交
     document.getElementById('requirement').addEventListener('keydown', function(e) {
       if (e.ctrlKey && e.key === 'Enter') {
         submitRequirement();
@@ -357,7 +435,7 @@ export class HomeController {
   }
 
   @Post('/api/submit')
-  async submit(@Body() body: { requirement: string }): Promise<{ success: boolean; message: string }> {
+  async submit(@Body() body: { requirement: string }): Promise<{ success: boolean; message: string; duplicate?: boolean }> {
     const { requirement } = body;
 
     if (!requirement || requirement.trim().length === 0) {
@@ -367,16 +445,437 @@ export class HomeController {
       };
     }
 
+    const ipAddress = this.getClientIP(this.ctx);
+    const userAgent = this.ctx.get('User-Agent');
+
+    // 检查该用户是否最近提交过（5 分钟内）
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const existingRecord = this.db.prepare(`
+      SELECT id FROM requirements 
+      WHERE ip_address = ? 
+      AND created_at > ?
+      LIMIT 1
+    `).get(ipAddress, fiveMinutesAgo);
+
+    if (existingRecord) {
+      return {
+        success: false,
+        duplicate: true,
+        message: '检测到重复提交',
+      };
+    }
+
+    // 解析需求内容
+    let author = '';
+    let requirementContent = requirement;
+    
+    const authorMatch = requirement.match(/作者：([^。]+)/);
+    if (authorMatch) {
+      author = authorMatch[1].trim();
+      requirementContent = requirement.replace(/作者：[^。]+。?/, '').trim();
+    }
+
+    // 保存到数据库
+    const stmt = this.db.prepare(`
+      INSERT INTO requirements (ip_address, user_agent, content, author, requirement_content)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    stmt.run(ipAddress, userAgent, requirement, author, requirementContent);
+
     // 随机选择一条提示文案
     const randomIndex = Math.floor(Math.random() * this.tipMessages.length);
     const message = this.tipMessages[randomIndex];
-
-    // 这里可以添加将需求保存到数据库的逻辑
-    console.log('收到新需求:', requirement);
 
     return {
       success: true,
       message: message,
     };
+  }
+
+  @Get('/clawiii')
+  async clawiii(): Promise<string> {
+    // 获取所有需求数据
+    const records = this.db.prepare(`
+      SELECT id, author, requirement_content, content, ip_address, created_at
+      FROM requirements
+      ORDER BY created_at DESC
+    `).all() as any[];
+
+    const rowsHtml = records.map((record, index) => `
+      <tr onclick="showDetail(${record.id})" style="cursor: pointer;">
+        <td>${index + 1}</td>
+        <td>${record.author || '匿名'}</td>
+        <td>${this.escapeHtml((record.requirement_content || record.content).substring(0, 50))}${(record.requirement_content || record.content).length > 50 ? '...' : ''}</td>
+        <td>${record.ip_address}</td>
+        <td>${record.created_at}</td>
+      </tr>
+    `).join('');
+
+    return `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求列表 - ClawIII</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      padding: 40px 20px;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(45deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 40px;
+      font-size: 1rem;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px 30px;
+      border-radius: 16px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(45deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+
+    .table-container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    th {
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #00d9ff;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    tbody tr {
+      transition: all 0.3s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 217, 255, 0.1);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .nav-link {
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    .nav-link a {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+
+    .nav-link a:hover {
+      color: #00d9ff;
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 40px;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 90%;
+      border: 1px solid rgba(0, 217, 255, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.3s ease;
+      position: relative;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .modal-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #00d9ff;
+      margin-bottom: 20px;
+    }
+
+    .modal-field {
+      margin-bottom: 20px;
+    }
+
+    .modal-label {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .modal-value {
+      color: #fff;
+      font-size: 1rem;
+      line-height: 1.6;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 3px solid #00d9ff;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .empty-state .emoji {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 ClawIII 需求管理</h1>
+    <p class="subtitle">查看所有已提交的需求</p>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number">${records.length}</div>
+        <div class="stat-label">总需求数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">${new Set(records.map(r => r.ip_address)).size}</div>
+        <div class="stat-label">提交用户</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      ${records.length > 0 ? `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>作者</th>
+            <th>需求内容</th>
+            <th>IP 地址</th>
+            <th>提交时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+      ` : `
+      <div class="empty-state">
+        <span class="emoji">📭</span>
+        <p>暂无需求数据</p>
+      </div>
+      `}
+    </div>
+
+    <div class="nav-link">
+      <a href="/">← 返回首页提交需求</a>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detailModal" onclick="closeModal(event)">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModalBtn()">&times;</button>
+      <h2 class="modal-title">📋 需求详情</h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const records = ${JSON.stringify(records)};
+
+    function showDetail(id) {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+
+      const modalBody = document.getElementById('modalBody');
+      modalBody.innerHTML = \`
+        <div class="modal-field">
+          <div class="modal-label">作者</div>
+          <div class="modal-value">\${record.author || '匿名'}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">完整需求内容</div>
+          <div class="modal-value">\${escapeHtml(record.content)}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">需求描述</div>
+          <div class="modal-value">\${escapeHtml(record.requirement_content || record.content)}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">IP 地址</div>
+          <div class="modal-value">\${record.ip_address}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">提交时间</div>
+          <div class="modal-value">\${record.created_at}</div>
+        </div>
+      \`;
+
+      document.getElementById('detailModal').classList.add('show');
+    }
+
+    function closeModal(event) {
+      if (event.target === document.getElementById('detailModal')) {
+        document.getElementById('detailModal').classList.remove('show');
+      }
+    }
+
+    function closeModalBtn() {
+      document.getElementById('detailModal').classList.remove('show');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 键盘 ESC 关闭
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.getElementById('detailModal').classList.remove('show');
+      }
+    });
+  </script>
+</body>
+</html>
+    `.trim();
+  }
+
+  private escapeHtml(text: string): string {
+    const div = { innerHTML: '' };
+    div.innerHTML = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+    return div.innerHTML;
   }
 }
