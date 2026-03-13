@@ -1,32 +1,44 @@
 import { Controller, Get, Post, Inject, Body } from '@midwayjs/core';
 import { Context } from '@midwayjs/koa';
 import * as path from 'path';
+import * as fs from 'fs';
+import initSqlJs, { Database } from 'sql.js';
 
 @Controller('/')
 export class HomeController {
   @Inject()
   ctx: Context;
 
-  private db: any;
+  private db: Database | null = null;
+  private dbInitialized = false;
 
-  constructor() {
-    // 初始化 SQLite 数据库
-    const Database = require('better-sqlite3');
-    const fs = require('fs');
+  // 初始化数据库（异步）
+  private async initDb(): Promise<Database> {
+    if (this.dbInitialized && this.db) {
+      return this.db;
+    }
+
+    const SQL = await initSqlJs();
     const dbPath = path.join(process.cwd(), 'data', 'requirements.db');
-    // 确保 data 目录存在
     const dataDir = path.dirname(dbPath);
+    
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    
-    this.db = new Database(dbPath);
-    
+
+    // 尝试加载现有数据库
+    if (fs.existsSync(dbPath)) {
+      const fileBuffer = fs.readFileSync(dbPath);
+      this.db = new SQL.Database(fileBuffer);
+    } else {
+      this.db = new SQL.Database();
+    }
+
     // 创建表
-    this.db.exec(`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS requirements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip_address TEXT NOT NULL,
+        ip_address TEXT NOT NULL UNIQUE,
         user_agent TEXT,
         content TEXT NOT NULL,
         author TEXT,
@@ -35,12 +47,19 @@ export class HomeController {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    this.dbInitialized = true;
+    return this.db;
+  }
+
+  // 保存数据库到文件
+  private async saveDb(): Promise<void> {
+    if (!this.db) return;
     
-    // 创建索引
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_ip_address ON requirements(ip_address);
-      CREATE INDEX IF NOT EXISTS idx_created_at ON requirements(created_at DESC);
-    `);
+    const dbPath = path.join(process.cwd(), 'data', 'requirements.db');
+    const data = this.db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
   }
 
   // 获取客户端 IP
@@ -239,25 +258,31 @@ export class HomeController {
       font-size: 0.95rem;
     }
 
+    input[type="text"],
     textarea {
       width: 100%;
-      min-height: 150px;
       padding: 16px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.9);
       font-size: 1rem;
       font-family: inherit;
-      resize: vertical;
       transition: all 0.3s ease;
     }
 
+    input[type="text"]:focus,
     textarea:focus {
       outline: none;
       border-color: rgba(255, 255, 255, 0.8);
       box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
     }
 
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    input[type="text"]::placeholder,
     textarea::placeholder {
       color: #999;
     }
@@ -320,13 +345,6 @@ export class HomeController {
       50% { transform: scale(1.2); }
     }
 
-    .format-hint {
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.7);
-      margin-top: 8px;
-      font-style: italic;
-    }
-
     .nav-link {
       text-align: center;
       margin-top: 20px;
@@ -350,13 +368,21 @@ export class HomeController {
     <p class="subtitle">提交你的需求，让我们一起创造奇迹</p>
     
     <div class="form-group">
+      <label for="author">✍️ 作者</label>
+      <input 
+        type="text" 
+        id="author" 
+        placeholder="请输入你的昵称"
+      />
+    </div>
+
+    <div class="form-group">
       <label for="requirement">✨ 需求内容</label>
       <textarea 
         id="requirement" 
-        placeholder="请输入需求，格式：作者：虾滑。需求内容：xxxx"
-        rows="6"
+        placeholder="请详细描述你的需求..."
+        rows="5"
       ></textarea>
-      <p class="format-hint">💡 提示：请按照"作者：xxx。需求内容：xxx"的格式填写</p>
     </div>
 
     <button class="btn-submit" onclick="submitRequirement()" id="submitBtn">
@@ -375,11 +401,17 @@ export class HomeController {
 
   <script>
     async function submitRequirement() {
+      const author = document.getElementById('author').value.trim();
       const requirement = document.getElementById('requirement').value.trim();
       const submitBtn = document.getElementById('submitBtn');
       const result = document.getElementById('result');
       const resultText = document.getElementById('resultText');
       const resultEmoji = document.getElementById('resultEmoji');
+
+      if (!author) {
+        alert('请输入作者昵称哦～');
+        return;
+      }
 
       if (!requirement) {
         alert('请输入需求内容哦～');
@@ -396,7 +428,7 @@ export class HomeController {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ requirement }),
+          body: JSON.stringify({ author, requirement }),
         });
 
         const data = await response.json();
@@ -406,13 +438,14 @@ export class HomeController {
           resultText.textContent = data.message;
           const emojis = ['🎉', '✨', '🚀', '💫', '🌟', '🔥', '💪', '🎯'];
           resultEmoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+          document.getElementById('author').value = '';
           document.getElementById('requirement').value = '';
         } else if (data.duplicate) {
           result.style.display = 'block';
-          resultText.textContent = '🤔 检测到您刚刚提交过相似的需求，请稍后再试～';
+          resultText.textContent = '🚫 每个用户只能提交一次需求哦，感谢您的参与～';
           resultEmoji.textContent = '⏰';
         } else {
-          alert('提交失败，请重试～');
+          alert(data.message || '提交失败，请重试～');
         }
       } catch (error) {
         console.error('提交失败:', error);
@@ -435,8 +468,15 @@ export class HomeController {
   }
 
   @Post('/api/submit')
-  async submit(@Body() body: { requirement: string }): Promise<{ success: boolean; message: string; duplicate?: boolean }> {
-    const { requirement } = body;
+  async submit(@Body() body: { author: string; requirement: string }): Promise<{ success: boolean; message: string; duplicate?: boolean }> {
+    const { author, requirement } = body;
+
+    if (!author || author.trim().length === 0) {
+      return {
+        success: false,
+        message: '作者昵称不能为空哦～',
+      };
+    }
 
     if (!requirement || requirement.trim().length === 0) {
       return {
@@ -445,17 +485,16 @@ export class HomeController {
       };
     }
 
+    const db = await this.initDb();
     const ipAddress = this.getClientIP(this.ctx);
     const userAgent = this.ctx.get('User-Agent');
 
-    // 检查该用户是否最近提交过（5 分钟内）
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const existingRecord = this.db.prepare(`
+    // 检查该 IP 是否已经提交过（永久去重）
+    const existingRecord = db.prepare(`
       SELECT id FROM requirements 
-      WHERE ip_address = ? 
-      AND created_at > ?
+      WHERE ip_address = ?
       LIMIT 1
-    `).get(ipAddress, fiveMinutesAgo);
+    `).get([ipAddress]);
 
     if (existingRecord) {
       return {
@@ -465,23 +504,14 @@ export class HomeController {
       };
     }
 
-    // 解析需求内容
-    let author = '';
-    let requirementContent = requirement;
-    
-    const authorMatch = requirement.match(/作者：([^。]+)/);
-    if (authorMatch) {
-      author = authorMatch[1].trim();
-      requirementContent = requirement.replace(/作者：[^。]+。?/, '').trim();
-    }
-
     // 保存到数据库
-    const stmt = this.db.prepare(`
+    db.run(`
       INSERT INTO requirements (ip_address, user_agent, content, author, requirement_content)
       VALUES (?, ?, ?, ?, ?)
-    `);
-    
-    stmt.run(ipAddress, userAgent, requirement, author, requirementContent);
+    `, [ipAddress, userAgent, `${author}：${requirement}`, author, requirement]);
+
+    // 保存数据库到文件
+    await this.saveDb();
 
     // 随机选择一条提示文案
     const randomIndex = Math.floor(Math.random() * this.tipMessages.length);
@@ -495,19 +525,26 @@ export class HomeController {
 
   @Get('/clawiii')
   async clawiii(): Promise<string> {
+    const db = await this.initDb();
+    
     // 获取所有需求数据
-    const records = this.db.prepare(`
+    const stmt = db.prepare(`
       SELECT id, author, requirement_content, content, ip_address, created_at
       FROM requirements
       ORDER BY created_at DESC
-    `).all() as any[];
+    `);
+    
+    const records: any[] = [];
+    while (stmt.step()) {
+      records.push(stmt.getAsObject());
+    }
 
     const rowsHtml = records.map((record, index) => `
       <tr onclick="showDetail(${record.id})" style="cursor: pointer;">
         <td>${index + 1}</td>
-        <td>${record.author || '匿名'}</td>
-        <td>${this.escapeHtml((record.requirement_content || record.content).substring(0, 50))}${(record.requirement_content || record.content).length > 50 ? '...' : ''}</td>
-        <td>${record.ip_address}</td>
+        <td>${this.escapeHtml(record.author || '匿名')}</td>
+        <td>${this.escapeHtml((record.requirement_content || '').substring(0, 50))}${(record.requirement_content || '').length > 50 ? '...' : ''}</td>
+        <td>${this.escapeHtml(record.ip_address)}</td>
         <td>${record.created_at}</td>
       </tr>
     `).join('');
@@ -817,19 +854,19 @@ export class HomeController {
       modalBody.innerHTML = \`
         <div class="modal-field">
           <div class="modal-label">作者</div>
-          <div class="modal-value">\${record.author || '匿名'}</div>
+          <div class="modal-value">\${escapeHtml(record.author || '匿名')}</div>
         </div>
         <div class="modal-field">
           <div class="modal-label">完整需求内容</div>
-          <div class="modal-value">\${escapeHtml(record.content)}</div>
+          <div class="modal-value">\${escapeHtml(record.content || '')}</div>
         </div>
         <div class="modal-field">
           <div class="modal-label">需求描述</div>
-          <div class="modal-value">\${escapeHtml(record.requirement_content || record.content)}</div>
+          <div class="modal-value">\${escapeHtml(record.requirement_content || '')}</div>
         </div>
         <div class="modal-field">
           <div class="modal-label">IP 地址</div>
-          <div class="modal-value">\${record.ip_address}</div>
+          <div class="modal-value">\${escapeHtml(record.ip_address || '')}</div>
         </div>
         <div class="modal-field">
           <div class="modal-label">提交时间</div>
@@ -869,13 +906,12 @@ export class HomeController {
   }
 
   private escapeHtml(text: string): string {
-    const div = { innerHTML: '' };
-    div.innerHTML = text
+    if (!text) return '';
+    return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    return div.innerHTML;
   }
 }

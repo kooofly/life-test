@@ -14,13 +14,12 @@
     "@midwayjs/validate": "^3.20.3",
     "@midwayjs/ws": "^3.20.3",
     "@types/ws": "^8.18.0",
-    "better-sqlite3": "^12.6.2",
     "lz-string": "^1.5.0",
+    "sql.js": "^1.14.1",
     "ws": "^8.18.1"
   },
   "devDependencies": {
     "@midwayjs/mock": "^3.12.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^29.2.0",
     "@types/node": "14",
     "cross-env": "^6.0.3",
