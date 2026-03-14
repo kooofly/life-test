@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求提交 - Hello Claw</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      padding: 50px 40px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(45deg, #fff, #f0f0f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 30px;
+      font-size: 1rem;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 0.95rem;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 1rem;
+      font-family: inherit;
+      transition: all 0.3s ease;
+    }
+
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.8);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    input[type="text"]::placeholder,
+    textarea::placeholder {
+      color: #999;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 16px 32px;
+      background: linear-gradient(45deg, #fff, #f0f0f0);
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #667eea;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .result {
+      margin-top: 25px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      text-align: center;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 500;
+      display: none;
+      animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .emoji {
+      font-size: 3rem;
+      margin-bottom: 15px;
+      display: block;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    .nav-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .nav-link a {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .nav-link a:hover {
+      color: #fff;
+    }
+
+    /* 示例卡片样式 */
+    .examples-section {
+      margin-top: 40px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .examples-title {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .example-card {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      padding: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .example-card:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .example-card .emoji {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      animation: none;
+    }
+
+    .example-card .title {
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+
+    .example-card .desc {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 500px) {
+      .examples-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🦾 Hello Claw</h1>
+    <p class="subtitle">提交你的需求，让我们一起创造奇迹</p>
+
+    <div class="form-group">
+      <label for="author">✍️ 作者</label>
+      <input
+        type="text"
+        id="author"
+        placeholder="请输入你的昵称"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="requirement">✨ 需求内容</label>
+      <textarea
+        id="requirement"
+        placeholder="请详细描述你的需求..."
+        rows="5"
+      ></textarea>
+    </div>
+
+    <button class="btn-submit" onclick="submitRequirement()" id="submitBtn">
+      🚀 提交需求
+    </button>
+
+    <div class="result" id="result">
+      <span class="emoji" id="resultEmoji">🎉</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="nav-link">
+      <a href="/clawiii">📊 查看已提交的需求</a>
+    </div>
+
+    <!-- 示例卡片 -->
+    <div class="examples-section">
+      <div class="examples-title">📋 需求范本（点击快速填充）</div>
+      <div class="examples-grid">
+        <!-- 电商行业 -->
+        <div class="example-card" onclick="fillExample('ecommerce')">
+          <div class="emoji">🛒</div>
+          <div class="title">电商商品列表</div>
+          <div class="desc">展示、排序、搜索、加载更多</div>
+        </div>
+        <!-- 金融行业 -->
+        <div class="example-card" onclick="fillExample('finance')">
+          <div class="emoji">💰</div>
+          <div class="title">金融收支记录</div>
+          <div class="desc">汇总展示、添加编辑、本地存储</div>
+        </div>
+        <!-- 教育行业 -->
+        <div class="example-card" onclick="fillExample('education')">
+          <div class="emoji">📚</div>
+          <div class="title">教育在线答题</div>
+          <div class="desc">题目展示、即时判断、得分统计</div>
+        </div>
+        <!-- 医疗行业 -->
+        <div class="example-card" onclick="fillExample('medical')">
+          <div class="emoji">🏥</div>
+          <div class="title">医疗预约登记</div>
+          <div class="desc">科室医生选择、时间选择、表单提交</div>
+        </div>
+        <!-- 物流行业 -->
+        <div class="example-card" onclick="fillExample('logistics')">
+          <div class="emoji">📦</div>
+          <div class="title">物流运单查询</div>
+          <div class="desc">运单输入、时间轴展示、一键复制</div>
+        </div>
+        <!-- 社交行业 -->
+        <div class="example-card" onclick="fillExample('social')">
+          <div class="emoji">💬</div>
+          <div class="title">社交发布动态</div>
+          <div class="desc">文本输入、图片选择、字数统计</div>
+        </div>
+        <!-- 餐饮行业 -->
+        <div class="example-card" onclick="fillExample('restaurant')">
+          <div class="emoji">🍔</div>
+          <div class="title">餐厅菜品详情</div>
+          <div class="desc">菜品展示、加购物车、评价列表</div>
+        </div>
+        <!-- 旅游行业 -->
+        <div class="example-card" onclick="fillExample('travel')">
+          <div class="emoji">✈️</div>
+          <div class="title">旅游景点列表</div>
+          <div class="desc">卡片展示、排序、收藏功能</div>
+        </div>
+        <!-- 人力资源 -->
+        <div class="example-card" onclick="fillExample('hr')">
+          <div class="emoji">👥</div>
+          <div class="title">HR 员工信息</div>
+          <div class="desc">表格展示、增删改查、统计功能</div>
+        </div>
+        <!-- 内容管理 -->
+        <div class="example-card" onclick="fillExample('cms')">
+          <div class="emoji">📝</div>
+          <div class="title">CMS 文章编辑</div>
+          <div class="desc">标题编辑、富文本、分类标签</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 随机作者列表
+    const randomAuthors = ['产品经理小王', '开发小哥', '设计小姐姐', '测试工程师', '创业团队',
+                           '技术总监', '运维达人', '数据分析狮', 'UI 设计师', '前端工程师',
+                           '后端开发', '全栈工程师', 'AI 研究员', '独立开发者', '产品实习生'];
+
+    // 示例需求数据
+    const exampleRequirements = {
+      'ecommerce': '开发一个商品列表页面：\n1. 展示商品图片、名称、价格、销量\n2. 支持按价格升序/降序排序\n3. 支持关键词搜索筛选\n4. 点击商品可查看详情\n5. 页面支持下拉加载更多',
+      'finance': '开发个人收支记录页面：\n1. 显示收入和支出金额汇总\n2. 列表展示每笔记录的分类、金额、日期\n3. 支持添加新记录（选择分类、输入金额）\n4. 支持删除和编辑已有记录\n5. 数据本地存储，下次打开可见',
+      'education': '开发在线答题练习页面：\n1. 显示题目内容和选项（单选/多选）\n2. 用户选择答案后即时判断对错\n3. 显示答题进度（如 3/10）\n4. 答题结束后显示得分和正确率\n5. 支持重新开始练习',
+      'medical': '开发挂号预约登记页面：\n1. 选择就诊科室（下拉列表）\n2. 选择医生（显示医生姓名和职称）\n3. 选择就诊日期和时间段\n4. 填写患者姓名、手机号\n5. 提交后显示预约成功确认信息',
+      'logistics': '开发物流运单查询页面：\n1. 输入框输入运单号\n2. 点击查询按钮显示物流信息\n3. 以时间轴形式展示运输节点\n4. 每个节点显示时间、地点、状态\n5. 支持复制运单号功能',
+      'social': '开发发布动态页面：\n1. 文本输入框（限制 500 字）\n2. 支持选择并预览图片（最多 6 张）\n3. 支持删除已选图片\n4. 显示字数统计\n5. 发布后跳转到动态列表',
+      'restaurant': '开发餐厅菜品详情页面：\n1. 展示菜品大图和名称\n2. 显示价格、月售数量、评分\n3. 显示食材和口味说明\n4. 选择数量加入购物车\n5. 显示用户评价列表',
+      'travel': '开发旅游景点列表页面：\n1. 卡片式展示景点（图片 + 名称 + 评分）\n2. 显示门票价格和开放时间\n3. 支持按评分/价格排序\n4. 支持收藏景点功能\n5. 点击卡片查看详细攻略',
+      'hr': '开发员工信息管理页面：\n1. 表格展示员工列表（姓名、部门、职位、入职日期）\n2. 支持搜索员工姓名\n3. 支持添加新员工\n4. 支持编辑和删除员工\n5. 显示员工总数统计',
+      'cms': '开发文章编辑页面：\n1. 标题输入框\n2. 富文本内容编辑器（支持加粗、斜体、插入图片）\n3. 选择文章分类\n4. 添加标签（支持多个）\n5. 支持保存草稿和发布'
+    };
+
+    // 填充示例数据
+    function fillExample(key) {
+      const content = exampleRequirements[key];
+      if (!content) return;
+
+      // 随机生成作者
+      const randomAuthor = randomAuthors[Math.floor(Math.random() * randomAuthors.length)];
+      document.getElementById('author').value = randomAuthor;
+
+      // 填充需求内容
+      document.getElementById('requirement').value = content;
+
+      // 聚焦到需求输入框
+      document.getElementById('requirement').focus();
+
+      // 滚动到表单区域
+      document.querySelector('.subtitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    async function submitRequirement() {
+      const author = document.getElementById('author').value.trim();
+      const requirement = document.getElementById('requirement').value.trim();
+      const submitBtn = document.getElementById('submitBtn');
+      const result = document.getElementById('result');
+      const resultText = document.getElementById('resultText');
+      const resultEmoji = document.getElementById('resultEmoji');
+
+      if (!author) {
+        alert('请输入作者昵称哦～');
+        return;
+      }
+
+      if (!requirement) {
+        alert('请输入需求内容哦～');
+        return;
+      }
+
+      // 禁用按钮
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ 提交中...';
+
+      try {
+        const response = await fetch('/api/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ author, requirement }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          result.style.display = 'block';
+          resultText.textContent = data.message;
+          const emojis = ['🎉', '✨', '🚀', '💫', '🌟', '🔥', '💪', '🎯'];
+          resultEmoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+          document.getElementById('author').value = '';
+          document.getElementById('requirement').value = '';
+        } else if (data.duplicate) {
+          result.style.display = 'block';
+          resultText.textContent = '🚫 每个用户只能提交一次需求哦，感谢您的参与～';
+          resultEmoji.textContent = '⏰';
+        } else {
+          alert(data.message || '提交失败，请重试～');
+        }
+      } catch (error) {
+        console.error('提交失败:', error);
+        alert('网络错误，请重试～');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🚀 提交需求';
+      }
+    }
+
+    document.getElementById('requirement').addEventListener('keydown', function(e) {
+      if (e.ctrlKey && e.key === 'Enter') {
+        submitRequirement();
+      }
+    });
+  </script>
+</body>
+</html>

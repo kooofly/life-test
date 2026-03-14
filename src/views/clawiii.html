@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求列表 - ClawIII</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      padding: 40px 20px;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(45deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 40px;
+      font-size: 1rem;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px 30px;
+      border-radius: 16px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(45deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+
+    .table-container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    th {
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #00d9ff;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    tbody tr {
+      transition: all 0.3s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 217, 255, 0.1);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* 审查标签样式 */
+    .tag {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 6px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+
+    .tag-invalid {
+      background: rgba(255, 71, 87, 0.3);
+      color: #ff4757;
+      border: 1px solid #ff4757;
+    }
+
+    .tag-quality-high {
+      background: rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+      border: 1px solid #60a5fa;
+    }
+
+    .tag-quality-medium {
+      background: rgba(100, 116, 139, 0.3);
+      color: #94a3b8;
+      border: 1px solid #94a3b8;
+    }
+
+    .tag-quality-low {
+      background: rgba(148, 163, 184, 0.2);
+      color: #64748b;
+      border: 1px solid #64748b;
+    }
+
+    .tag-difficulty-high {
+      background: rgba(168, 85, 247, 0.3);
+      color: #c084fc;
+      border: 1px solid #c084fc;
+    }
+
+    .tag-difficulty-medium {
+      background: rgba(139, 92, 246, 0.2);
+      color: #a78bfa;
+      border: 1px solid #a78bfa;
+    }
+
+    .tag-difficulty-low {
+      background: rgba(129, 140, 248, 0.15);
+      color: #818cf8;
+      border: 1px solid #818cf8;
+    }
+
+    .tag-reviewing {
+      background: rgba(251, 191, 36, 0.3);
+      color: #fbbf24;
+      border: 1px solid #fbbf24;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    .tags-container {
+      margin-bottom: 6px;
+    }
+
+    /* 表格单元格样式 */
+    .review-cell {
+      min-width: 180px;
+    }
+
+    .reviewer-cell {
+      min-width: 100px;
+      white-space: nowrap;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .requirement-cell {
+      max-width: 400px;
+    }
+
+    .tag-pending {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .tag-default {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-link {
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    .nav-link a {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+
+    .nav-link a:hover {
+      color: #00d9ff;
+      background: rgba(0, 217, 255, 0.2);
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 40px;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 90%;
+      border: 1px solid rgba(0, 217, 255, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.3s ease;
+      position: relative;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .modal-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #00d9ff;
+      margin-bottom: 20px;
+    }
+
+    .modal-field {
+      margin-bottom: 20px;
+    }
+
+    .modal-label {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .modal-value {
+      color: #fff;
+      font-size: 1rem;
+      line-height: 1.6;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 3px solid #00d9ff;
+    }
+
+    /* 审查结果样式 */
+    .review-section {
+      background: rgba(0, 217, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .review-title {
+      color: #00d9ff;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+
+    .review-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .review-tag {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .review-tag.invalid {
+      background: rgba(255, 71, 87, 0.3);
+      color: #ff4757;
+    }
+
+    .review-tag.quality-high {
+      background: rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+    }
+
+    .review-tag.difficulty-high {
+      background: rgba(168, 85, 247, 0.3);
+      color: #c084fc;
+    }
+
+    .review-reason {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .review-time {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .empty-state .emoji {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 ClawIII 需求管理</h1>
+    <p class="subtitle">查看所有已提交的需求</p>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number" id="stat-total">0</div>
+        <div class="stat-label">总需求数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-users">0</div>
+        <div class="stat-label">提交用户</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-invalid">0</div>
+        <div class="stat-label">无效需求</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-high-quality">0</div>
+        <div class="stat-label">高质量需求</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div id="table-content"></div>
+    </div>
+
+    <div class="nav-link">
+      <a href="/">← 返回首页提交需求</a>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detailModal" onclick="closeModal(event)">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModalBtn()">&times;</button>
+      <h2 class="modal-title">📋 需求详情</h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const records = __RECORDS__;
+
+    // 更新统计数据
+    document.getElementById('stat-total').textContent = records.length;
+    document.getElementById('stat-users').textContent = new Set(records.map(r => r.ip_address)).size;
+    document.getElementById('stat-invalid').textContent = records.filter(r => r.is_invalid === 1).length;
+    document.getElementById('stat-high-quality').textContent = records.filter(r => r.quality_level === 'high').length;
+
+    // 生成表格内容
+    const tableContent = document.getElementById('table-content');
+    if (records.length > 0) {
+      let rowsHtml = '';
+      records.forEach((record, index) => {
+        const reviewResult = generateReviewResult(record);
+        const reviewerDisplay = record.reviewer || '待审查';
+        const requirementText = (record.requirement_content || '').substring(0, 50);
+        const requirementDisplay = requirementText + ((record.requirement_content || '').length > 50 ? '...' : '');
+
+        rowsHtml += `
+          <tr onclick="showDetail(${record.id})" style="cursor: pointer;">
+            <td>${index + 1}</td>
+            <td>${escapeHtml(record.author || '匿名')}</td>
+            <td class="requirement-cell">${escapeHtml(requirementDisplay)}</td>
+            <td class="review-cell">${reviewResult}</td>
+            <td class="reviewer-cell">${reviewerDisplay}</td>
+            <td>${record.created_at}</td>
+          </tr>
+        `;
+      });
+
+      tableContent.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>作者</th>
+              <th>需求内容</th>
+              <th>审查结果</th>
+              <th>审查者</th>
+              <th>提交时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+    } else {
+      tableContent.innerHTML = `
+        <div class="empty-state">
+          <span class="emoji">📭</span>
+          <p>暂无需求数据</p>
+        </div>
+      `;
+    }
+
+    // 生成审查结果 HTML
+    function generateReviewResult(record) {
+      if (record.reviewed_at === null && record.reviewing_status === 1) {
+        return '<span class="tag tag-reviewing">⏳ 审查中</span>';
+      }
+
+      if (record.reviewed_at) {
+        const parts = [];
+
+        if (record.quality_level === 'high') {
+          parts.push('<span class="tag tag-quality-high">⭐ 高质量</span>');
+        } else if (record.quality_level === 'medium') {
+          parts.push('<span class="tag tag-quality-medium">📝 普通</span>');
+        } else if (record.quality_level === 'low') {
+          parts.push('<span class="tag tag-quality-low">📄 简单</span>');
+        }
+
+        if (record.difficulty_level === 'high') {
+          parts.push('<span class="tag tag-difficulty-high">🔥 高难度</span>');
+        } else if (record.difficulty_level === 'medium') {
+          parts.push('<span class="tag tag-difficulty-medium">⚙️ 中等</span>');
+        } else if (record.difficulty_level === 'low') {
+          parts.push('<span class="tag tag-difficulty-low">🔹 简单</span>');
+        }
+
+        if (record.is_invalid === 1) {
+          parts.push('<span class="tag tag-invalid">❌ 无效</span>');
+        }
+
+        return parts.length > 0 ? `<div class="tags-container">${parts.join('')}</div>` : '<span class="tag tag-default">已审查</span>';
+      }
+
+      return '<span class="tag tag-pending">⏳ 待审查</span>';
+    }
+
+    function showDetail(id) {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+
+      const modalBody = document.getElementById('modalBody');
+
+      let reviewHtml = '';
+      if (record.reviewed_at || record.is_invalid !== null) {
+        const tags = [];
+        if (record.is_invalid === 1) {
+          tags.push('<span class="review-tag invalid">❌ 无效需求</span>');
+        }
+        if (record.quality_level === 'high') {
+          tags.push('<span class="review-tag quality-high">⭐ 高质量</span>');
+        }
+        if (record.difficulty_level === 'high') {
+          tags.push('<span class="review-tag difficulty-high">🧩 高难度</span>');
+        }
+
+        if (tags.length > 0 || record.review_reason) {
+          reviewHtml = `
+            <div class="review-section">
+              <div class="review-title">🤖 AI 审查结果</div>
+              <div class="review-tags">${tags.join('')}</div>
+              ${record.review_reason ? `<div class="review-reason">📝 ${escapeHtml(record.review_reason)}</div>` : ''}
+              ${record.reviewed_at ? `<div class="review-time">⏰ 审查时间：${record.reviewed_at}</div>` : ''}
+            </div>
+          `;
+        }
+      }
+
+      modalBody.innerHTML = `
+        <div class="modal-field">
+          <div class="modal-label">作者</div>
+          <div class="modal-value">${escapeHtml(record.author || '匿名')}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">完整需求内容</div>
+          <div class="modal-value">${escapeHtml(record.content || '')}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">需求描述</div>
+          <div class="modal-value">${escapeHtml(record.requirement_content || '')}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">IP 地址</div>
+          <div class="modal-value">${escapeHtml(record.ip_address || '')}</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">提交时间</div>
+          <div class="modal-value">${record.created_at}</div>
+        </div>
+        ${reviewHtml}
+      `;
+
+      document.getElementById('detailModal').classList.add('show');
+    }
+
+    function closeModal(event) {
+      if (event.target === document.getElementById('detailModal')) {
+        document.getElementById('detailModal').classList.remove('show');
+      }
+    }
+
+    function closeModalBtn() {
+      document.getElementById('detailModal').classList.remove('show');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.getElementById('detailModal').classList.remove('show');
+      }
+    });
+  </script>
+</body>
+</html>

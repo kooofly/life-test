@@ -14,3 +14,5 @@ run/
 IFLOW.md
 .claude/
 .iflow/
+models/
+data/

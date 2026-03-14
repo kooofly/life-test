@@ -3,6 +3,7 @@ import { Context } from '@midwayjs/koa';
 import * as path from 'path';
 import * as fs from 'fs';
 import initSqlJs, { Database } from 'sql.js';
+import { ReviewService, ReviewResult } from '../service/review.service';
 
 // 单例数据库管理
 class DbManager {
@@ -58,10 +59,38 @@ class DbManager {
         content TEXT NOT NULL,
         author TEXT,
         requirement_content TEXT,
+        quality_level TEXT,
+        difficulty_level TEXT,
+        is_invalid INTEGER DEFAULT 0,
+        review_reason TEXT,
+        reviewed_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // 检查是否需要添加新列（旧数据库升级）
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN quality_level TEXT');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN difficulty_level TEXT');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN is_invalid INTEGER DEFAULT 0');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN review_reason TEXT');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN reviewed_at DATETIME');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN reviewing_status INTEGER DEFAULT 0');
+    } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN reviewer TEXT');
+    } catch (e) { /* 列已存在 */ }
 
     return this.db;
   }
@@ -81,7 +110,19 @@ export class HomeController {
   @Inject()
   ctx: Context;
 
+  @Inject()
+  reviewService: ReviewService;
+
   private dbManager = DbManager.getInstance();
+
+  // 审查队列（异步处理）
+  private reviewQueue: Array<{
+    id: number;
+    content: string;
+    author: string;
+  }> = [];
+
+  private isProcessingQueue = false;
 
   // 获取客户端 IP
   private getClientIP(ctx: Context): string {
@@ -127,7 +168,6 @@ export class HomeController {
     '🌺 花朵绽放！需求已生根发芽～',
     '🦋 破茧成蝶！需求正在蜕变～',
     '🐝 勤劳蜜蜂！需求正在采蜜中～',
-    '🐿️ 松鼠囤粮！需求已存入仓库～',
     '🦉 智慧猫头鹰！需求已被深思熟虑～',
     '🦄 独角兽认证！需求充满魔力～',
     '🐲 龙腾虎跃！需求气势如虹～',
@@ -208,284 +248,8 @@ export class HomeController {
 
   @Get('/')
   async home(): Promise<string> {
-    return `
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>需求提交 - Hello Claw</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      padding: 20px;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 600px;
-      padding: 50px 40px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      animation: float 6s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-10px); }
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      background: linear-gradient(45deg, #fff, #f0f0f0);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: rgba(255, 255, 255, 0.8);
-      margin-bottom: 30px;
-      font-size: 1rem;
-    }
-
-    .form-group {
-      margin-bottom: 25px;
-    }
-
-    label {
-      display: block;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 600;
-      margin-bottom: 10px;
-      font-size: 0.95rem;
-    }
-
-    input[type="text"],
-    textarea {
-      width: 100%;
-      padding: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.9);
-      font-size: 1rem;
-      font-family: inherit;
-      transition: all 0.3s ease;
-    }
-
-    input[type="text"]:focus,
-    textarea:focus {
-      outline: none;
-      border-color: rgba(255, 255, 255, 0.8);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-    }
-
-    textarea {
-      min-height: 120px;
-      resize: vertical;
-    }
-
-    input[type="text"]::placeholder,
-    textarea::placeholder {
-      color: #999;
-    }
-
-    .btn-submit {
-      width: 100%;
-      padding: 16px 32px;
-      background: linear-gradient(45deg, #fff, #f0f0f0);
-      border: none;
-      border-radius: 12px;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #667eea;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    }
-
-    .btn-submit:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-
-    .btn-submit:active {
-      transform: translateY(0);
-    }
-
-    .btn-submit:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-
-    .result {
-      margin-top: 25px;
-      padding: 20px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
-      text-align: center;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 500;
-      display: none;
-      animation: fadeIn 0.5s ease;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .emoji {
-      font-size: 3rem;
-      margin-bottom: 15px;
-      display: block;
-      animation: bounce 2s ease-in-out infinite;
-    }
-
-    @keyframes bounce {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.2); }
-    }
-
-    .nav-link {
-      text-align: center;
-      margin-top: 20px;
-    }
-
-    .nav-link a {
-      color: rgba(255, 255, 255, 0.8);
-      text-decoration: none;
-      font-size: 0.9rem;
-      transition: color 0.3s;
-    }
-
-    .nav-link a:hover {
-      color: #fff;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>🦾 Hello Claw</h1>
-    <p class="subtitle">提交你的需求，让我们一起创造奇迹</p>
-    
-    <div class="form-group">
-      <label for="author">✍️ 作者</label>
-      <input 
-        type="text" 
-        id="author" 
-        placeholder="请输入你的昵称"
-      />
-    </div>
-
-    <div class="form-group">
-      <label for="requirement">✨ 需求内容</label>
-      <textarea 
-        id="requirement" 
-        placeholder="请详细描述你的需求..."
-        rows="5"
-      ></textarea>
-    </div>
-
-    <button class="btn-submit" onclick="submitRequirement()" id="submitBtn">
-      🚀 提交需求
-    </button>
-
-    <div class="result" id="result">
-      <span class="emoji" id="resultEmoji">🎉</span>
-      <span id="resultText"></span>
-    </div>
-
-    <div class="nav-link">
-      <a href="/clawiii">📊 查看已提交的需求</a>
-    </div>
-  </div>
-
-  <script>
-    async function submitRequirement() {
-      const author = document.getElementById('author').value.trim();
-      const requirement = document.getElementById('requirement').value.trim();
-      const submitBtn = document.getElementById('submitBtn');
-      const result = document.getElementById('result');
-      const resultText = document.getElementById('resultText');
-      const resultEmoji = document.getElementById('resultEmoji');
-
-      if (!author) {
-        alert('请输入作者昵称哦～');
-        return;
-      }
-
-      if (!requirement) {
-        alert('请输入需求内容哦～');
-        return;
-      }
-
-      // 禁用按钮
-      submitBtn.disabled = true;
-      submitBtn.textContent = '⏳ 提交中...';
-
-      try {
-        const response = await fetch('/api/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ author, requirement }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          result.style.display = 'block';
-          resultText.textContent = data.message;
-          const emojis = ['🎉', '✨', '🚀', '💫', '🌟', '🔥', '💪', '🎯'];
-          resultEmoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-          document.getElementById('author').value = '';
-          document.getElementById('requirement').value = '';
-        } else if (data.duplicate) {
-          result.style.display = 'block';
-          resultText.textContent = '🚫 每个用户只能提交一次需求哦，感谢您的参与～';
-          resultEmoji.textContent = '⏰';
-        } else {
-          alert(data.message || '提交失败，请重试～');
-        }
-      } catch (error) {
-        console.error('提交失败:', error);
-        alert('网络错误，请重试～');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = '🚀 提交需求';
-      }
-    }
-
-    document.getElementById('requirement').addEventListener('keydown', function(e) {
-      if (e.ctrlKey && e.key === 'Enter') {
-        submitRequirement();
-      }
-    });
-  </script>
-</body>
-</html>
-    `.trim();
+    const htmlPath = path.join(process.cwd(), 'src', 'views', 'home.html');
+    return fs.readFileSync(htmlPath, 'utf-8');
   }
 
   @Post('/api/submit')
@@ -513,16 +277,16 @@ export class HomeController {
     // 检查该 IP 是否已经提交过（永久去重）
     const stmt = db.prepare('SELECT id FROM requirements WHERE ip_address = ? LIMIT 1');
     stmt.bind([ipAddress]);
-    const hasRecord = stmt.step();
+    // const hasRecord = stmt.step();
     stmt.free();
 
-    if (hasRecord) {
-      return {
-        success: false,
-        duplicate: true,
-        message: '检测到重复提交',
-      };
-    }
+    // if (hasRecord) {
+    //   return {
+    //     success: false,
+    //     duplicate: true,
+    //     message: '检测到重复提交',
+    //   };
+    // }
 
     // 保存到数据库
     db.run(
@@ -530,8 +294,17 @@ export class HomeController {
       [ipAddress, userAgent, `${author}：${requirement}`, author, requirement]
     );
 
+    // 获取刚插入的 ID
+    const idResult = db.exec('SELECT last_insert_rowid() as id');
+    const insertId = idResult[0]?.values[0]?.[0] as number;
+
     // 保存数据库到文件
     await this.dbManager.saveDb();
+
+    // 异步触发 AI 审查（不阻塞响应）
+    if (insertId) {
+      this.addToReviewQueue(insertId, requirement, author);
+    }
 
     // 随机选择一条提示文案
     const randomIndex = Math.floor(Math.random() * this.tipMessages.length);
@@ -543,392 +316,114 @@ export class HomeController {
     };
   }
 
+  /**
+   * 将审查请求加入队列
+   * 异步后台处理，不阻塞主流程
+   */
+  private async addToReviewQueue(id: number, content: string, author: string) {
+    this.reviewQueue.push({ id, content, author });
+
+    // 先设置审查中状态（确保写入后再开始审查）
+    await this.setReviewingStatus(id, 1);
+
+    // 启动队列处理（如果还未在处理）
+    if (!this.isProcessingQueue) {
+      this.processReviewQueue();
+    }
+  }
+
+  /**
+   * 设置审查中状态
+   */
+  private async setReviewingStatus(id: number, status: number) {
+    try {
+      const db = await this.dbManager.getDb();
+      db.run(
+        'UPDATE requirements SET reviewing_status = ? WHERE id = ?',
+        [status, id]
+      );
+      await this.dbManager.saveDb();
+    } catch (error) {
+      console.error(`[Review] 设置审查状态失败:`, error.message);
+    }
+  }
+
+  /**
+   * 处理审查队列
+   * 逐个处理，避免内存积累
+   */
+  private async processReviewQueue() {
+    if (this.reviewQueue.length === 0) {
+      this.isProcessingQueue = false;
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    while (this.reviewQueue.length > 0) {
+      const item = this.reviewQueue.shift();
+      if (!item) continue;
+
+      // 模拟审查延迟（让"审查中"状态可见，实际生产环境可移除）
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      try {
+        // 使用超时保护，5 秒超时
+        const reviewPromise = this.reviewService.review(item.content, item.author);
+        const timeoutPromise = new Promise<ReviewResult>((_, reject) => {
+          setTimeout(() => reject(new Error('审查超时')), 5000);
+        });
+
+        const result = await Promise.race([reviewPromise, timeoutPromise]);
+
+        // 确定审查者名称
+        const reviewerName = result.reviewer === 'ai' ? '小虾' : '小霞';
+
+        // 更新数据库
+        const db = await this.dbManager.getDb();
+        db.run(
+          'UPDATE requirements SET quality_level = ?, difficulty_level = ?, is_invalid = ?, review_reason = ?, reviewed_at = CURRENT_TIMESTAMP, reviewing_status = 0, reviewer = ? WHERE id = ?',
+          [result.quality_level, result.difficulty_level, result.is_invalid, result.review_reason, reviewerName, item.id]
+        );
+        await this.dbManager.saveDb();
+
+        console.log(`[Review] 需求 #${item.id} 审查完成：${result.quality_level}, ${result.difficulty_level}, invalid=${result.is_invalid}, reviewer=${reviewerName}`);
+      } catch (error) {
+        console.error(`[Review] 需求 #${item.id} 审查失败:`, error.message);
+        // 审查失败也清除审查中状态
+        await this.setReviewingStatus(item.id, 0);
+      }
+
+      // 手动触发 GC（如果可用），避免内存积累
+      if (global.gc) {
+        global.gc();
+      }
+    }
+
+    this.isProcessingQueue = false;
+  }
+
   @Get('/clawiii')
   async clawiii(): Promise<string> {
     const db = await this.dbManager.getDb();
-    
-    // 获取所有需求数据
-    const stmt = db.prepare('SELECT id, author, requirement_content, content, ip_address, created_at FROM requirements ORDER BY created_at DESC');
-    
+
+    // 获取所有需求数据（包括审查结果和审查状态）
+    const stmt = db.prepare('SELECT id, author, requirement_content, content, ip_address, quality_level, difficulty_level, is_invalid, review_reason, reviewed_at, created_at, reviewing_status, reviewer FROM requirements ORDER BY created_at DESC');
+
     const records: any[] = [];
     while (stmt.step()) {
       records.push(stmt.getAsObject());
     }
     stmt.free();
 
-    const rowsHtml = records.map((record, index) => `
-      <tr onclick="showDetail(${record.id})" style="cursor: pointer;">
-        <td>${index + 1}</td>
-        <td>${this.escapeHtml(record.author || '匿名')}</td>
-        <td>${this.escapeHtml((record.requirement_content || '').substring(0, 50))}${(record.requirement_content || '').length > 50 ? '...' : ''}</td>
-        <td>${this.escapeHtml(record.ip_address)}</td>
-        <td>${record.created_at}</td>
-      </tr>
-    `).join('');
+    // 读取外部 HTML 模板文件
+    const htmlPath = path.join(process.cwd(), 'src', 'views', 'clawiii.html');
+    let html = fs.readFileSync(htmlPath, 'utf-8');
 
-    return `
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>需求列表 - ClawIII</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    // 替换模板变量
+    html = html.replace('__RECORDS__', JSON.stringify(records));
 
-    body {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      padding: 40px 20px;
-      color: #fff;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      background: linear-gradient(45deg, #00d9ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: rgba(255, 255, 255, 0.7);
-      margin-bottom: 40px;
-      font-size: 1rem;
-    }
-
-    .stats {
-      display: flex;
-      justify-content: center;
-      gap: 30px;
-      margin-bottom: 30px;
-    }
-
-    .stat-card {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      padding: 20px 30px;
-      border-radius: 16px;
-      text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .stat-number {
-      font-size: 2.5rem;
-      font-weight: 700;
-      background: linear-gradient(45deg, #00d9ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-label {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.9rem;
-      margin-top: 5px;
-    }
-
-    .table-container {
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    thead {
-      background: rgba(0, 217, 255, 0.2);
-    }
-
-    th {
-      padding: 16px;
-      text-align: left;
-      font-weight: 600;
-      color: #00d9ff;
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    td {
-      padding: 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    tbody tr {
-      transition: all 0.3s ease;
-    }
-
-    tbody tr:hover {
-      background: rgba(0, 217, 255, 0.1);
-    }
-
-    tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    .nav-link {
-      text-align: center;
-      margin-top: 30px;
-    }
-
-    .nav-link a {
-      color: rgba(255, 255, 255, 0.8);
-      text-decoration: none;
-      font-size: 0.9rem;
-      transition: color 0.3s;
-      padding: 10px 20px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-    }
-
-    .nav-link a:hover {
-      color: #00d9ff;
-      background: rgba(0, 217, 255, 0.2);
-    }
-
-    /* Modal Styles */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(5px);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .modal.show {
-      display: flex;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    .modal-content {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      padding: 40px;
-      border-radius: 20px;
-      max-width: 600px;
-      width: 90%;
-      border: 1px solid rgba(0, 217, 255, 0.3);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-      animation: slideUp 0.3s ease;
-      position: relative;
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(50px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .modal-close {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: none;
-      border: none;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 1.5rem;
-      cursor: pointer;
-      transition: color 0.3s;
-    }
-
-    .modal-close:hover {
-      color: #fff;
-    }
-
-    .modal-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #00d9ff;
-      margin-bottom: 20px;
-    }
-
-    .modal-field {
-      margin-bottom: 20px;
-    }
-
-    .modal-label {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-
-    .modal-value {
-      color: #fff;
-      font-size: 1rem;
-      line-height: 1.6;
-      background: rgba(255, 255, 255, 0.05);
-      padding: 15px;
-      border-radius: 8px;
-      border-left: 3px solid #00d9ff;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .empty-state .emoji {
-      font-size: 4rem;
-      margin-bottom: 20px;
-      display: block;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>📊 ClawIII 需求管理</h1>
-    <p class="subtitle">查看所有已提交的需求</p>
-
-    <div class="stats">
-      <div class="stat-card">
-        <div class="stat-number">${records.length}</div>
-        <div class="stat-label">总需求数</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">${new Set(records.map(r => r.ip_address)).size}</div>
-        <div class="stat-label">提交用户</div>
-      </div>
-    </div>
-
-    <div class="table-container">
-      ${records.length > 0 ? `
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>作者</th>
-            <th>需求内容</th>
-            <th>IP 地址</th>
-            <th>提交时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
-      </table>
-      ` : `
-      <div class="empty-state">
-        <span class="emoji">📭</span>
-        <p>暂无需求数据</p>
-      </div>
-      `}
-    </div>
-
-    <div class="nav-link">
-      <a href="/">← 返回首页提交需求</a>
-    </div>
-  </div>
-
-  <!-- Detail Modal -->
-  <div class="modal" id="detailModal" onclick="closeModal(event)">
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeModalBtn()">&times;</button>
-      <h2 class="modal-title">📋 需求详情</h2>
-      <div id="modalBody"></div>
-    </div>
-  </div>
-
-  <script>
-    const records = ${JSON.stringify(records)};
-
-    function showDetail(id) {
-      const record = records.find(r => r.id === id);
-      if (!record) return;
-
-      const modalBody = document.getElementById('modalBody');
-      modalBody.innerHTML = \`
-        <div class="modal-field">
-          <div class="modal-label">作者</div>
-          <div class="modal-value">\${escapeHtml(record.author || '匿名')}</div>
-        </div>
-        <div class="modal-field">
-          <div class="modal-label">完整需求内容</div>
-          <div class="modal-value">\${escapeHtml(record.content || '')}</div>
-        </div>
-        <div class="modal-field">
-          <div class="modal-label">需求描述</div>
-          <div class="modal-value">\${escapeHtml(record.requirement_content || '')}</div>
-        </div>
-        <div class="modal-field">
-          <div class="modal-label">IP 地址</div>
-          <div class="modal-value">\${escapeHtml(record.ip_address || '')}</div>
-        </div>
-        <div class="modal-field">
-          <div class="modal-label">提交时间</div>
-          <div class="modal-value">\${record.created_at}</div>
-        </div>
-      \`;
-
-      document.getElementById('detailModal').classList.add('show');
-    }
-
-    function closeModal(event) {
-      if (event.target === document.getElementById('detailModal')) {
-        document.getElementById('detailModal').classList.remove('show');
-      }
-    }
-
-    function closeModalBtn() {
-      document.getElementById('detailModal').classList.remove('show');
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // 键盘 ESC 关闭
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') {
-        document.getElementById('detailModal').classList.remove('show');
-      }
-    });
-  </script>
-</body>
-</html>
-    `.trim();
+    return html;
   }
 
-  private escapeHtml(text: string): string {
-    if (!text) return '';
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
 }
