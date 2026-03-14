@@ -91,6 +91,9 @@ class DbManager {
     try {
       this.db.run('ALTER TABLE requirements ADD COLUMN reviewer TEXT');
     } catch (e) { /* 列已存在 */ }
+    try {
+      this.db.run('ALTER TABLE requirements ADD COLUMN execution_status TEXT DEFAULT \'pending\'');
+    } catch (e) { /* 列已存在 */ }
 
     return this.db;
   }
@@ -424,6 +427,70 @@ export class HomeController {
     html = html.replace('__RECORDS__', JSON.stringify(records));
 
     return html;
+  }
+
+  @Get('/admin')
+  async admin(): Promise<string> {
+    const db = await this.dbManager.getDb();
+
+    // 获取所有需求数据（包括执行状态）
+    const stmt = db.prepare('SELECT id, author, requirement_content, content, ip_address, quality_level, difficulty_level, is_invalid, review_reason, reviewed_at, created_at, reviewing_status, reviewer, execution_status FROM requirements ORDER BY created_at DESC');
+
+    const records: any[] = [];
+    while (stmt.step()) {
+      records.push(stmt.getAsObject());
+    }
+    stmt.free();
+
+    // 读取外部 HTML 模板文件
+    const htmlPath = path.join(process.cwd(), 'src', 'views', 'admin.html');
+    let html = fs.readFileSync(htmlPath, 'utf-8');
+
+    // 替换模板变量
+    html = html.replace('__RECORDS__', JSON.stringify(records));
+
+    return html;
+  }
+
+  @Post('/api/execution/update')
+  async updateExecution(@Body() body: { id: number; status: string }): Promise<{ success: boolean; message?: string }> {
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return {
+        success: false,
+        message: '参数不完整',
+      };
+    }
+
+    // 验证状态值
+    const validStatuses = ['pending', 'in_progress', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return {
+        success: false,
+        message: '无效的状态值',
+      };
+    }
+
+    try {
+      const db = await this.dbManager.getDb();
+      db.run(
+        'UPDATE requirements SET execution_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [status, id]
+      );
+      await this.dbManager.saveDb();
+
+      return {
+        success: true,
+        message: '状态更新成功',
+      };
+    } catch (error) {
+      console.error('[Execution] 更新执行状态失败:', error.message);
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
   }
 
 }
