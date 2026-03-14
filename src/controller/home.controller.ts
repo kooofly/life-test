@@ -493,4 +493,27 @@ export class HomeController {
     }
   }
 
+  @Get('/game')
+  async game(): Promise<string> {
+    const db = await this.dbManager.getDb();
+
+    // 获取所有需求数据（包括执行状态）
+    const stmt = db.prepare('SELECT id, author, requirement_content, content, ip_address, quality_level, difficulty_level, is_invalid, review_reason, reviewed_at, created_at, reviewing_status, reviewer, execution_status FROM requirements ORDER BY created_at DESC');
+
+    const records: any[] = [];
+    while (stmt.step()) {
+      records.push(stmt.getAsObject());
+    }
+    stmt.free();
+
+    // 读取外部 HTML 模板文件
+    const htmlPath = path.join(process.cwd(), 'src', 'views', 'game.html');
+    let html = fs.readFileSync(htmlPath, 'utf-8');
+
+    // 替换模板变量
+    html = html.replace('__RECORDS__', JSON.stringify(records));
+
+    return html;
+  }
+
 }

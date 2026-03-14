@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求大冒险 - Pixel Quest</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0a1a;
+      --bg-medium: #1a1a2e;
+      --neon-pink: #ff00ff;
+      --neon-cyan: #00ffff;
+      --neon-green: #00ff00;
+      --neon-yellow: #ffff00;
+      --neon-orange: #ff8800;
+      --neon-red: #ff0000;
+      --pixel-gold: #ffd700;
+      --pixel-blue: #0088ff;
+      --pixel-green: #00cc00;
+      --pixel-gray: #888888;
+      --pixel-white: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-dark);
+      font-family: 'VT323', monospace;
+      color: var(--pixel-white);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* CRT 扫描线效果 */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.1) 0px,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* CRT 闪烁效果 */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 0%,
+        transparent 80%,
+        rgba(0, 0, 0, 0.3) 100%
+      );
+      pointer-events: none;
+      z-index: 9998;
+      animation: crtFlicker 0.1s infinite;
+    }
+
+    @keyframes crtFlicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.98; }
+    }
+
+    /* 游戏标题区域 */
+    .game-header {
+      text-align: center;
+      padding: 30px 20px 20px;
+      background: linear-gradient(180deg, var(--bg-medium) 0%, var(--bg-dark) 100%);
+      border-bottom: 4px solid var(--neon-cyan);
+    }
+
+    .game-title {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      color: var(--neon-pink);
+      text-shadow: 3px 3px 0px var(--neon-cyan), -1px -1px 0 var(--neon-yellow);
+      margin-bottom: 20px;
+      animation: titlePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes titlePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+
+    /* 统计面板 */
+    .stats-panel {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .stat-box {
+      background: var(--bg-medium);
+      border: 3px solid var(--neon-green);
+      padding: 10px 20px;
+      min-width: 120px;
+      text-align: center;
+      box-shadow: 0 0 10px var(--neon-green);
+    }
+
+    .stat-box.pending { border-color: var(--pixel-gray); box-shadow: 0 0 10px var(--pixel-gray); }
+    .stat-box.reviewing { border-color: var(--neon-yellow); box-shadow: 0 0 10px var(--neon-yellow); }
+    .stat-box.executing { border-color: var(--neon-orange); box-shadow: 0 0 10px var(--neon-orange); }
+    .stat-box.completed { border-color: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+
+    .stat-value {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.2rem;
+      color: var(--pixel-white);
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--pixel-gray);
+      margin-top: 5px;
+    }
+
+    /* 游戏场景 */
+    .game-scene {
+      position: relative;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      min-height: 60vh;
+    }
+
+    /* 地面 */
+    .game-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background:
+        linear-gradient(90deg,
+          var(--bg-medium) 0%,
+          var(--bg-dark) 50%,
+          var(--bg-medium) 100%);
+      border-top: 4px solid var(--neon-cyan);
+    }
+
+    /* 审查者区域 */
+    .reviewer-zone {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .reviewer-card {
+      background: var(--bg-medium);
+      border: 3px solid var(--neon-pink);
+      padding: 15px;
+      min-width: 150px;
+      text-align: center;
+    }
+
+    .reviewer-avatar {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 10px;
+      image-rendering: pixelated;
+    }
+
+    .reviewer-name {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.7rem;
+      color: var(--neon-pink);
+    }
+
+    .reviewer-status {
+      font-size: 0.85rem;
+      color: var(--pixel-gray);
+      margin-top: 5px;
+    }
+
+    /* 需求小人容器 */
+    .characters-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      align-items: flex-end;
+      padding-bottom: 70px;
+      min-height: 300px;
+    }
+
+    /* 像素小人 */
+    .pixel-character {
+      position: relative;
+      width: 80px;
+      height: 100px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      animation: characterBreathe 2s ease-in-out infinite;
+    }
+
+    .pixel-character:hover {
+      transform: scale(1.1);
+    }
+
+    @keyframes characterBreathe {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.05); }
+    }
+
+    @keyframes characterWalk {
+      0%, 100% { transform: translateY(0); }
+      25% { transform: translateY(-3px); }
+      50% { transform: translateY(0); }
+      75% { transform: translateY(-3px); }
+    }
+
+    @keyframes characterCelebrate {
+      0%, 100% { transform: translateY(0); }
+      25% { transform: translateY(-10px) rotate(-5deg); }
+      50% { transform: translateY(0); }
+      75% { transform: translateY(-10px) rotate(5deg); }
+    }
+
+    @keyframes characterReviewing {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.3); }
+    }
+
+    /* 小人身体部分（CSS 像素画） */
+    .char-body {
+      position: absolute;
+      width: 40px;
+      height: 50px;
+      left: 20px;
+      top: 30px;
+    }
+
+    .char-head {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      left: 24px;
+      top: 0;
+      border-radius: 4px;
+    }
+
+    .char-legs {
+      position: absolute;
+      width: 12px;
+      height: 20px;
+      left: 24px;
+      top: 80px;
+    }
+
+    .char-legs::before,
+    .char-legs::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 20px;
+      background: inherit;
+    }
+
+    .char-legs::before { left: 0; }
+    .char-legs::after { right: 0; }
+
+    .char-arms {
+      position: absolute;
+      width: 16px;
+      height: 20px;
+      left: 32px;
+      top: 40px;
+    }
+
+    .char-arms::before,
+    .char-arms::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 20px;
+      background: inherit;
+    }
+
+    .char-arms::before { left: 0; }
+    .char-arms::after { right: 0; }
+
+    /* 笔记本电脑 */
+    .char-laptop {
+      position: absolute;
+      width: 20px;
+      height: 14px;
+      right: -10px;
+      top: 45px;
+      background: var(--pixel-gray);
+      border: 2px solid var(--pixel-white);
+    }
+
+    /* 作者名字标签 */
+    .char-name-tag {
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-medium);
+      border: 2px solid var(--pixel-white);
+      padding: 4px 8px;
+      white-space: nowrap;
+      font-size: 0.8rem;
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 状态颜色 */
+    .char-pending .char-head,
+    .char-pending .char-body,
+    .char-pending .char-legs,
+    .char-pending .char-arms {
+      background: var(--pixel-gray);
+    }
+
+    .char-reviewing .char-head,
+    .char-reviewing .char-body,
+    .char-reviewing .char-legs,
+    .char-reviewing .char-arms {
+      background: var(--neon-yellow);
+      animation: characterReviewing 1s ease-in-out infinite;
+    }
+
+    .char-quality-high .char-head,
+    .char-quality-high .char-body,
+    .char-quality-high .char-legs,
+    .char-quality-high .char-arms {
+      background: var(--pixel-gold);
+    }
+
+    .char-quality-medium .char-head,
+    .char-quality-medium .char-body,
+    .char-quality-medium .char-legs,
+    .char-quality-medium .char-arms {
+      background: var(--pixel-blue);
+    }
+
+    .char-quality-low .char-head,
+    .char-quality-low .char-body,
+    .char-quality-low .char-legs,
+    .char-quality-low .char-arms {
+      background: var(--pixel-green);
+    }
+
+    .char-executing .char-head,
+    .char-executing .char-body,
+    .char-executing .char-legs,
+    .char-executing .char-arms {
+      background: var(--neon-orange);
+      animation: characterWalk 0.5s ease-in-out infinite;
+    }
+
+    .char-completed .char-head,
+    .char-completed .char-body,
+    .char-completed .char-legs,
+    .char-completed .char-arms {
+      background: var(--neon-green);
+      animation: characterCelebrate 1s ease-in-out infinite;
+    }
+
+    /* 状态图标 */
+    .char-status-icon {
+      position: absolute;
+      top: -45px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+    }
+
+    /* 像素风对话框 */
+    .pixel-dialog {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--bg-medium);
+      border: 4px solid var(--neon-cyan);
+      padding: 20px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      z-index: 10000;
+      box-shadow:
+        0 0 20px var(--neon-cyan),
+        inset 0 0 20px rgba(0, 255, 255, 0.1);
+    }
+
+    .pixel-dialog.show {
+      display: block;
+      animation: dialogOpen 0.3s ease-out;
+    }
+
+    @keyframes dialogOpen {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .dialog-header {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8rem;
+      color: var(--neon-yellow);
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px dashed var(--pixel-gray);
+    }
+
+    .dialog-content {
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+
+    .dialog-field {
+      margin-bottom: 15px;
+    }
+
+    .dialog-label {
+      color: var(--neon-pink);
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+
+    .dialog-value {
+      color: var(--pixel-white);
+      background: var(--bg-dark);
+      padding: 10px;
+      border: 2px solid var(--pixel-gray);
+    }
+
+    .dialog-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .dialog-tag {
+      padding: 5px 10px;
+      border: 2px solid;
+      font-size: 0.8rem;
+      font-family: 'Press Start 2P', cursive;
+    }
+
+    .dialog-tag.quality-high {
+      border-color: var(--pixel-gold);
+      color: var(--pixel-gold);
+    }
+
+    .dialog-tag.difficulty-high {
+      border-color: var(--neon-pink);
+      color: var(--neon-pink);
+    }
+
+    .dialog-tag.invalid {
+      border-color: var(--neon-red);
+      color: var(--neon-red);
+    }
+
+    .dialog-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--neon-red);
+      border: 2px solid var(--pixel-white);
+      color: var(--pixel-white);
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8rem;
+    }
+
+    .dialog-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 9999;
+    }
+
+    .dialog-overlay.show {
+      display: block;
+    }
+
+    /* 底部控制栏 */
+    .game-footer {
+      text-align: center;
+      padding: 20px;
+      background: var(--bg-medium);
+      border-top: 4px solid var(--neon-pink);
+    }
+
+    .game-controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      background: var(--bg-dark);
+      border: 3px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      padding: 10px 20px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: var(--neon-cyan);
+      color: var(--bg-dark);
+    }
+
+    .control-btn.active {
+      background: var(--neon-pink);
+      border-color: var(--neon-pink);
+      color: var(--pixel-white);
+    }
+
+    .control-instruction {
+      margin-top: 15px;
+      font-size: 0.9rem;
+      color: var(--pixel-gray);
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--pixel-gray);
+    }
+
+    .empty-state .pixel-art {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+
+    /* 导航链接 */
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .nav-links a {
+      color: var(--neon-cyan);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 8px 16px;
+      border: 2px solid var(--neon-cyan);
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover {
+      background: var(--neon-cyan);
+      color: var(--bg-dark);
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      .game-title {
+        font-size: 1rem;
+      }
+
+      .stat-box {
+        min-width: 80px;
+        padding: 8px 12px;
+      }
+
+      .stat-value {
+        font-size: 0.9rem;
+      }
+
+      .stat-label {
+        font-size: 0.7rem;
+      }
+
+      .pixel-character {
+        width: 60px;
+        height: 80px;
+      }
+
+      .char-head {
+        width: 24px;
+        height: 24px;
+        left: 18px;
+      }
+
+      .char-body {
+        width: 30px;
+        height: 40px;
+        left: 15px;
+        top: 25px;
+      }
+
+      .char-legs {
+        left: 18px;
+        top: 65px;
+      }
+
+      .reviewer-zone {
+        position: static;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+
+      .game-scene {
+        padding: 20px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 游戏标题 -->
+  <header class="game-header">
+    <h1 class="game-title">🎮 需求大冒险 - Pixel Quest</h1>
+
+    <div class="stats-panel">
+      <div class="stat-box pending">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">TOTAL</div>
+      </div>
+      <div class="stat-box pending">
+        <div class="stat-value" id="stat-pending">0</div>
+        <div class="stat-label">PENDING</div>
+      </div>
+      <div class="stat-box reviewing">
+        <div class="stat-value" id="stat-reviewing">0</div>
+        <div class="stat-label">REVIEWING</div>
+      </div>
+      <div class="stat-box executing">
+        <div class="stat-value" id="stat-executing">0</div>
+        <div class="stat-label">EXECUTING</div>
+      </div>
+      <div class="stat-box completed">
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">COMPLETED</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 游戏场景 -->
+  <main class="game-scene">
+    <!-- 审查者区域 -->
+    <div class="reviewer-zone" id="reviewerZone"></div>
+
+    <!-- 角色容器 -->
+    <div class="characters-container" id="charactersContainer"></div>
+
+    <!-- 地面 -->
+    <div class="game-floor"></div>
+  </main>
+
+  <!-- 对话框 -->
+  <div class="dialog-overlay" id="dialogOverlay" onclick="closeDialog()"></div>
+  <div class="pixel-dialog" id="pixelDialog">
+    <button class="dialog-close" onclick="closeDialog()">X</button>
+    <div class="dialog-header" id="dialogHeader">QUEST INFO</div>
+    <div class="dialog-content" id="dialogContent"></div>
+  </div>
+
+  <!-- 底部控制栏 -->
+  <footer class="game-footer">
+    <div class="game-controls">
+      <button class="control-btn active" data-filter="all">ALL</button>
+      <button class="control-btn" data-filter="pending">PENDING</button>
+      <button class="control-btn" data-filter="reviewing">REVIEW</button>
+      <button class="control-btn" data-filter="executing">EXECUTE</button>
+      <button class="control-btn" data-filter="completed">DONE</button>
+    </div>
+    <div class="control-instruction">
+      👆 点击角色查看详情 | 使用滤镜筛选
+    </div>
+    <div class="nav-links">
+      <a href="/admin">🎛️ 管理后台</a>
+      <a href="/clawiii">📊 需求列表</a>
+      <a href="/">← 返回首页</a>
+    </div>
+  </footer>
+
+  <script>
+    const records = __RECORDS__;
+    let currentFilter = 'all';
+
+    // 更新统计数据
+    function updateStats() {
+      document.getElementById('stat-total').textContent = records.length;
+      document.getElementById('stat-pending').textContent = records.filter(r =>
+        (r.execution_status === 'pending' || !r.execution_status) &&
+        (!r.reviewed_at || r.reviewed_at === null)
+      ).length;
+      document.getElementById('stat-reviewing').textContent = records.filter(r =>
+        r.reviewing_status === 1 || r.reviewed_at !== null
+      ).length;
+      document.getElementById('stat-executing').textContent = records.filter(r =>
+        r.execution_status === 'in_progress'
+      ).length;
+      document.getElementById('stat-completed').textContent = records.filter(r =>
+        r.execution_status === 'completed'
+      ).length;
+    }
+
+    // 获取角色状态类名
+    function getCharacterClass(record) {
+      if (record.execution_status === 'completed') {
+        return 'char-completed';
+      }
+      if (record.execution_status === 'in_progress') {
+        return 'char-executing';
+      }
+      if (record.reviewing_status === 1) {
+        return 'char-reviewing';
+      }
+      if (record.reviewed_at) {
+        if (record.quality_level === 'high') {
+          return 'char-quality-high';
+        } else if (record.quality_level === 'medium') {
+          return 'char-quality-medium';
+        } else {
+          return 'char-quality-low';
+        }
+      }
+      return 'char-pending';
+    }
+
+    // 获取状态图标
+    function getStatusIcon(record) {
+      if (record.execution_status === 'completed') {
+        return '✅';
+      }
+      if (record.execution_status === 'in_progress') {
+        return '🔨';
+      }
+      if (record.reviewing_status === 1) {
+        return '⏳';
+      }
+      if (record.reviewed_at) {
+        if (record.quality_level === 'high') {
+          return '⭐';
+        } else if (record.quality_level === 'medium') {
+          return '📝';
+        } else {
+          return '📄';
+        }
+      }
+      return '💤';
+    }
+
+    // 渲染角色
+    function renderCharacters() {
+      const container = document.getElementById('charactersContainer');
+
+      let filteredRecords = records;
+      if (currentFilter === 'pending') {
+        filteredRecords = records.filter(r =>
+          (r.execution_status === 'pending' || !r.execution_status) &&
+          (!r.reviewed_at || r.reviewed_at === null)
+        );
+      } else if (currentFilter === 'reviewing') {
+        filteredRecords = records.filter(r =>
+          r.reviewing_status === 1 || (r.reviewed_at && r.reviewed_at !== null)
+        );
+      } else if (currentFilter === 'executing') {
+        filteredRecords = records.filter(r => r.execution_status === 'in_progress');
+      } else if (currentFilter === 'completed') {
+        filteredRecords = records.filter(r => r.execution_status === 'completed');
+      }
+
+      if (filteredRecords.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="pixel-art">👾</div>
+            <p>NO CHARACTERS FOUND</p>
+            <p>Try a different filter!</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filteredRecords.map(record => {
+        const charClass = getCharacterClass(record);
+        const statusIcon = getStatusIcon(record);
+        const shortName = (record.author || '匿名').substring(0, 8);
+
+        return `
+          <div class="pixel-character ${charClass}" onclick="showDetail(${record.id})">
+            <div class="char-status-icon">${statusIcon}</div>
+            <div class="char-name-tag">${shortName}</div>
+            <div class="char-head"></div>
+            <div class="char-body"></div>
+            <div class="char-arms"></div>
+            <div class="char-legs"></div>
+            <div class="char-laptop"></div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染审查者
+    function renderReviewers() {
+      const container = document.getElementById('reviewerZone');
+
+      // 统计每个审查者正在审查的数量
+      const xiaoxiaCount = records.filter(r => r.reviewer === '小霞' && r.reviewing_status === 1).length;
+      const xiaoxiaCompleted = records.filter(r => r.reviewer === '小霞' && r.reviewed_at).length;
+      const xiaoxiaCount2 = records.filter(r => r.reviewer === '小虾' && r.reviewing_status === 1).length;
+      const xiaoxiaCompleted2 = records.filter(r => r.reviewer === '小虾' && r.reviewed_at).length;
+
+      container.innerHTML = `
+        <div class="reviewer-card">
+          <div class="reviewer-avatar">🦐</div>
+          <div class="reviewer-name">XIAOXIA</div>
+          <div class="reviewer-status">
+            ${xiaoxiaCount2 > 0 ? '🔄 REVIEWING...' : '💤 IDLE'}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--pixel-gray); margin-top: 5px;">
+            ✅ ${xiaoxiaCompleted2} COMPLETED
+          </div>
+        </div>
+        <div class="reviewer-card">
+          <div class="reviewer-avatar">🦞</div>
+          <div class="reviewer-name">XIAOXIA</div>
+          <div class="reviewer-status">
+            ${xiaoxiaCount > 0 ? '🔄 REVIEWING...' : '💤 IDLE'}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--pixel-gray); margin-top: 5px;">
+            ✅ ${xiaoxiaCompleted} COMPLETED
+          </div>
+        </div>
+      `;
+    }
+
+    // 显示详情
+    function showDetail(id) {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+
+      const dialog = document.getElementById('pixelDialog');
+      const overlay = document.getElementById('dialogOverlay');
+      const header = document.getElementById('dialogHeader');
+      const content = document.getElementById('dialogContent');
+
+      // 生成状态标签
+      let tagsHtml = '';
+      if (record.quality_level === 'high') {
+        tagsHtml += '<span class="dialog-tag quality-high">⭐ HIGH QUALITY</span>';
+      }
+      if (record.difficulty_level === 'high') {
+        tagsHtml += '<span class="dialog-tag difficulty-high">🔥 HARD</span>';
+      }
+      if (record.is_invalid === 1) {
+        tagsHtml += '<span class="dialog-tag invalid">❌ INVALID</span>';
+      }
+
+      // 执行状态
+      const execStatus = record.execution_status || 'pending';
+      const execStatusText = execStatus === 'pending' ? 'PENDING' : execStatus === 'in_progress' ? 'IN PROGRESS' : 'COMPLETED';
+
+      content.innerHTML = `
+        <div class="dialog-field">
+          <div class="dialog-label">👤 AUTHOR</div>
+          <div class="dialog-value">${escapeHtml(record.author || 'Anonymous')}</div>
+        </div>
+        <div class="dialog-field">
+          <div class="dialog-label">📝 REQUIREMENT</div>
+          <div class="dialog-value">${escapeHtml(record.requirement_content || 'No content')}</div>
+        </div>
+        <div class="dialog-field">
+          <div class="dialog-label">🚀 EXECUTION STATUS</div>
+          <div class="dialog-value">${execStatusText}</div>
+        </div>
+        <div class="dialog-field">
+          <div class="dialog-label">🤖 AI REVIEW</div>
+          <div class="dialog-value">
+            ${record.reviewer ? 'Reviewer: ' + record.reviewer : 'Pending review...'}
+            ${tagsHtml ? '<div class="dialog-tags">' + tagsHtml + '</div>' : ''}
+            ${record.review_reason ? '<div style="margin-top: 10px; color: var(--pixel-gray);">📝 ' + escapeHtml(record.review_reason) + '</div>' : ''}
+          </div>
+        </div>
+        <div class="dialog-field">
+          <div class="dialog-label">⏰ SUBMITTED</div>
+          <div class="dialog-value">${record.created_at || 'Unknown'}</div>
+        </div>
+      `;
+
+      header.textContent = 'QUEST #' + record.id + ' INFO';
+      dialog.classList.add('show');
+      overlay.classList.add('show');
+    }
+
+    // 关闭对话框
+    function closeDialog() {
+      document.getElementById('pixelDialog').classList.remove('show');
+      document.getElementById('dialogOverlay').classList.remove('show');
+    }
+
+    // 转义 HTML
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 筛选器事件
+    document.querySelectorAll('.control-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.control-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderCharacters();
+      });
+    });
+
+    // ESC 关闭对话框
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeDialog();
+      }
+    });
+
+    // 初始化
+    updateStats();
+    renderCharacters();
+    renderReviewers();
+  </script>
+</body>
+</html>
